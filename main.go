@@ -5,10 +5,16 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	"regexp"
+	"strings"
 	"text/template"
 
 	"github.com/goulash/pr"
@@ -51,10 +57,55 @@ type GithubRepo struct {
 //		b) https protocol: `https://github.com/username/repository.git`
 //
 func FindGithubInfo(_ string) (*GithubRepo, error) {
-	// TODO: implement this
+	out, err := exec.Command("git", "remote", "-v").Output()
+	if err != nil {
+		return nil, err
+	}
+
+	r := regexp.MustCompilePOSIX(`([^\t]+)\t(git@|http://|https://)github\.com[/:]([^/]+)/(.+)\.git[ \t]*.*`)
+	infos := make(map[string][2]string)
+	scanner := bufio.NewScanner(bytes.NewBuffer(out))
+	for scanner.Scan() {
+		s := scanner.Text()
+		if !strings.Contains(s, "github") {
+			continue
+		}
+		if !r.MatchString(s) {
+			fmt.Fprintf(os.Stderr, "Warning: cannot match %q.\n", s)
+			continue
+		}
+
+		ls := r.FindStringSubmatch(s)
+		source, _, user, repo := ls[1], ls[2], ls[3], ls[4]
+		infos[source] = [2]string{user, repo}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	var up [2]string
+	if len(infos) == 0 {
+		return nil, errors.New("not a GitHub repository")
+	} else if len(infos) == 1 {
+		for _, v := range infos {
+			up = v
+		}
+	} else {
+		// Try the origin repository first; if it exists, it is bound to be the right one.
+		if v, ok := infos["origin"]; ok {
+			up = v
+		} else {
+			for k, v := range infos {
+				fmt.Fprintf(os.Stderr, "Warning: multiple GitHub repositories; using source %q.\n", k)
+				up = v
+				break
+			}
+		}
+	}
+
 	return &GithubRepo{
-		User: "cassava",
-		Name: "repoctl",
+		User: up[0],
+		Name: up[1],
 	}, nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2013, Ben Morgan. All rights reserved.
+// Copyright (c) 2015, Ben Morgan. All rights reserved.
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
 
@@ -17,7 +17,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/goulash/pr"
+	"github.com/goulash/color"
 	"github.com/ogier/pflag"
 )
 
@@ -126,7 +126,7 @@ func GetReleaseInfo(gi *GithubRepo) error {
 	return nil
 }
 
-func dieIfFatal(err error) {
+func mustNot(err error) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
@@ -134,25 +134,17 @@ func dieIfFatal(err error) {
 }
 
 func main() {
-	color := pflag.String("color", "auto", "whether to use color (always|auto|never)")
+	color := color.New()
+	pflag.Var(color, "color", "when to use color (always|auto|never)")
 	pflag.Parse()
 
-	colorizer := pr.NewColorizer()
-	if *color == "auto" {
-		colorizer.SetFile(os.Stdout)
-	} else if *color == "always" {
-		colorizer.SetEnabled(true)
-	} else if *color == "never" {
-		colorizer.SetEnabled(false)
-	}
-
 	wd, err := os.Getwd()
-	dieIfFatal(err)
+	mustNot(err)
 	gr, err := FindGithubInfo(wd)
-	dieIfFatal(err)
+	mustNot(err)
 	err = GetReleaseInfo(gr)
-	dieIfFatal(err)
+	mustNot(err)
 
-	t := template.Must(template.New("output").Parse(colorizer.Sprint(outputTmpl)))
+	t := template.Must(template.New("output").Parse(color.Sprint(outputTmpl)))
 	t.Execute(os.Stdout, gr)
 }

@@ -35,7 +35,7 @@ type GithubRepo struct {
 		Name   string `json:"name"`
 		Assets []struct {
 			Name          string `json:"name"`
-			DownloadCount int    `json:"download_count`
+			DownloadCount int    `json:"download_count"`
 		} `json:"assets"`
 	}
 }
